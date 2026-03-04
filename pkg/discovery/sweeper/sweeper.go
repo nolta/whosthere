@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	discovery2 "github.com/ramonvermeulen/whosthere/pkg/discovery"
+	"github.com/ramonvermeulen/whosthere/pkg/discovery"
 )
 
 const (
@@ -23,7 +23,7 @@ var (
 	tcpTriggerPorts = []int{80, 443}
 )
 
-var _ discovery2.Sweeper = (*Sweeper)(nil)
+var _ discovery.Sweeper = (*Sweeper)(nil)
 
 // Sweeper populates the system ARP cache by triggering network traffic.
 // Since whosthere runs without elevated privileges, it cannot send ARP requests directly.
@@ -36,10 +36,10 @@ var _ discovery2.Sweeper = (*Sweeper)(nil)
 //
 // Runs continuously at the configured interval when started.
 type Sweeper struct {
-	iface    *discovery2.InterfaceInfo
+	iface    *discovery.InterfaceInfo
 	interval time.Duration
 	timeout  time.Duration
-	logger   discovery2.Logger
+	logger   discovery.Logger
 }
 
 // New creates a Sweeper with the specified options.
@@ -60,9 +60,9 @@ type Sweeper struct {
 //	}
 func New(opts ...Option) (*Sweeper, error) {
 	s := &Sweeper{
-		interval: discovery2.DefaultSweepInterval,
-		timeout:  discovery2.DefaultSweepTimeout,
-		logger:   &discovery2.NoOpLogger{},
+		interval: discovery.DefaultSweepInterval,
+		timeout:  discovery.DefaultSweepTimeout,
+		logger:   &discovery.NoOpLogger{},
 	}
 
 	for _, opt := range opts {

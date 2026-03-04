@@ -120,6 +120,7 @@ func TestWithPollInterval_SetsInterval(t *testing.T) {
 	}
 	if s == nil {
 		t.Fatal("expected scanner")
+		return
 	}
 	if s.pollInterval != interval {
 		t.Fatalf("expected pollInterval %s, got %s", interval, s.pollInterval)
