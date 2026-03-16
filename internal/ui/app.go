@@ -288,7 +288,9 @@ func (a *App) handleEvents() {
 			a.applyTheme(event.Name)
 			a.state.SetCurrentTheme(event.Name)
 		case events.ThemeSaved:
-			_ = theme.SaveToConfig(event.Name, a.cfg)
+			if err := theme.SaveToConfig(event.Name, a.cfg); err != nil {
+				a.logger.Error("failed to save theme", "error", err)
+			}
 		case events.ThemeConfirmed:
 			a.state.SetPreviousTheme(a.state.CurrentTheme())
 		case events.HideView:

@@ -50,14 +50,14 @@ func resolveConfigPath(pathOverride string) (string, error) {
 
 // writeConfigFile marshals the config to YAML and writes it to the specified path,
 // ensuring the parent directory exists.
-func writeConfigFile(path string, _ *Config) error {
+func writeConfigFile(path string, cfg *Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
-	data := GenerateDefaultYAML()
+	data := []byte(GenerateYAML(cfg))
 
-	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("write config file: %w", err)
 	}
 

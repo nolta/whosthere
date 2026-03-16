@@ -55,7 +55,7 @@ func (tp *ThemePicker) setupInputHandling() {
 				tp.emit(events.ThemeSelected{Name: tp.themes[prevIdx]})
 			}
 			return nil
-		case event.Key() == tcell.KeyEnter && event.Modifiers()&tcell.ModShift != 0:
+		case event.Rune() == 's' || event.Rune() == 'S' || (event.Key() == tcell.KeyEnter && event.Modifiers()&tcell.ModShift != 0):
 			currentIdx := tp.GetCurrentItem()
 			if currentIdx >= 0 && currentIdx < len(tp.themes) {
 				tp.emit(events.ThemeSaved{Name: tp.themes[currentIdx]})

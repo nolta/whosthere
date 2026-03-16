@@ -7,9 +7,15 @@ import (
 )
 
 func GenerateDefaultYAML() string {
+	return GenerateYAML(nil)
+}
+
+func GenerateYAML(cfg *Config) string {
 	var sb strings.Builder
 	settings := getYAMLSettings()
-	defaults := DefaultConfig()
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
 
 	var prevPath []string
 	for i, s := range settings {
@@ -36,7 +42,7 @@ func GenerateDefaultYAML() string {
 			}
 		}
 
-		writeSettingLine(&sb, &s, parts, indent, defaults)
+		writeSettingLine(&sb, &s, parts, indent, cfg)
 		if s.Doc.BlankLineAfter {
 			sb.WriteString("\n")
 		}

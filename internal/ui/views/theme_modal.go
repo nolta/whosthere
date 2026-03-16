@@ -27,7 +27,7 @@ func NewThemeModalView(emit func(events.Event)) *ThemeModalView {
 	footer := tview.NewTextView()
 	footer.SetDynamicColors(true).
 		SetTextAlign(tview.AlignCenter).
-		SetText("j/k: navigate" + components.Divider + "Enter: keep" + components.Divider + "Shift+Enter: save" + components.Divider + "Esc: cancel")
+		SetText("j/k: navigate" + components.Divider + "Enter: keep" + components.Divider + "s/Shift+Enter: save" + components.Divider + "Esc: cancel")
 	footer.SetTextColor(tview.Styles.SecondaryTextColor)
 	footer.SetBackgroundColor(tview.Styles.PrimitiveBackgroundColor)
 
