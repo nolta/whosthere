@@ -143,3 +143,38 @@ func equalIntSlices(a, b []int) bool {
 	}
 	return true
 }
+
+func TestParseStringSlice(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"", nil},
+		{"   ", nil},
+		{"10.0.0.0/24", []string{"10.0.0.0/24"}},
+		{"10.0.0.0/24,10.0.1.0/24", []string{"10.0.0.0/24", "10.0.1.0/24"}},
+		{"10.0.0.0/24 , 10.0.1.0/24 ", []string{"10.0.0.0/24", "10.0.1.0/24"}},
+		{"a,,b", []string{"a", "b"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := parseStringSlice(tt.input)
+			if !equalStringSlices(got, tt.expected) {
+				t.Errorf("parseStringSlice(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

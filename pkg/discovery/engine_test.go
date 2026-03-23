@@ -141,3 +141,163 @@ func TestEngine_StartStop_ClosesEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestEngine_Scan_TargetSubnetsFiltersDevices(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+	_, targetNet, _ := net.ParseCIDR("10.0.0.0/24")
+
+	inRange := discovery.NewDevice(testkit.MustIP(t, "10.0.0.5"))
+	outOfRange := discovery.NewDevice(testkit.MustIP(t, "172.16.0.5"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{inRange, outOfRange}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+		discovery.WithTargetSubnets([]*net.IPNet{targetNet}),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	results, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+	require.Len(t, results.Devices, 1)
+	require.Equal(t, "10.0.0.5", results.Devices[0].IP().String())
+}
+
+func TestEngine_Scan_NoTargetSubnetsKeepsAllDevices(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+
+	d1 := discovery.NewDevice(testkit.MustIP(t, "192.168.0.5"))
+	d2 := discovery.NewDevice(testkit.MustIP(t, "10.0.0.5"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{d1, d2}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	results, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+	require.Len(t, results.Devices, 2)
+}
+
+func TestEngine_Scan_ReactiveSweepTriggeredForOutOfRangeDevice(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+	sw := &testkit.FakeSweeper{}
+
+	outOfRange := discovery.NewDevice(testkit.MustIP(t, "10.0.1.50"))
+	inRange := discovery.NewDevice(testkit.MustIP(t, "192.168.0.5"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{inRange, outOfRange}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+		discovery.WithSweeper(sw),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	results, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+	require.Len(t, results.Devices, 2)
+
+	time.Sleep(50 * time.Millisecond)
+
+	swept := sw.GetSweptSubnets()
+	require.Len(t, swept, 1)
+	require.Equal(t, "10.0.1.0/24", swept[0].String())
+}
+
+func TestEngine_Scan_ReactiveSweepNotTriggeredForInRangeDevice(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+	sw := &testkit.FakeSweeper{}
+
+	inRange := discovery.NewDevice(testkit.MustIP(t, "192.168.0.5"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{inRange}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+		discovery.WithSweeper(sw),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Empty(t, sw.GetSweptSubnets())
+}
+
+func TestEngine_Scan_ReactiveSweepDeduplicatesSameSubnet(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+	sw := &testkit.FakeSweeper{}
+
+	d1 := discovery.NewDevice(testkit.MustIP(t, "10.0.1.50"))
+	d2 := discovery.NewDevice(testkit.MustIP(t, "10.0.1.51"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{d1, d2}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+		discovery.WithSweeper(sw),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+
+	time.Sleep(50 * time.Millisecond)
+
+	swept := sw.GetSweptSubnets()
+	require.Len(t, swept, 1)
+	require.Equal(t, "10.0.1.0/24", swept[0].String())
+}
+
+func TestEngine_Scan_ReactiveSweepNotTriggeredWithTargetSubnets(t *testing.T) {
+	iface := testkit.MustInterfaceInfo(t)
+	sw := &testkit.FakeSweeper{}
+	_, targetNet, _ := net.ParseCIDR("10.0.0.0/24")
+
+	inTarget := discovery.NewDevice(testkit.MustIP(t, "10.0.0.5"))
+	outOfTarget := discovery.NewDevice(testkit.MustIP(t, "172.16.0.5"))
+
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{inTarget, outOfTarget}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(iface),
+		discovery.WithScanners(s),
+		discovery.WithScanTimeout(500*time.Millisecond),
+		discovery.WithSweeper(sw),
+		discovery.WithTargetSubnets([]*net.IPNet{targetNet}),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	results, scanErr := e.Scan(ctx)
+	require.NoError(t, scanErr)
+	require.Len(t, results.Devices, 1)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Empty(t, sw.GetSweptSubnets())
+}

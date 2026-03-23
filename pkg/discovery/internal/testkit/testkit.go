@@ -3,6 +3,7 @@ package testkit
 import (
 	"context"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -63,9 +64,27 @@ func (s *FakeScanner) Scan(ctx context.Context, out chan<- *discovery.Device) er
 	return s.Err
 }
 
-type FakeSweeper struct{ Started atomic.Int64 }
+type FakeSweeper struct {
+	Started      atomic.Int64
+	SweptSubnets []*net.IPNet
+	sweptMu      sync.Mutex
+}
 
 func (s *FakeSweeper) Start(ctx context.Context) { _ = ctx; s.Started.Add(1) }
+
+func (s *FakeSweeper) Sweep(_ context.Context, subnet *net.IPNet) {
+	s.sweptMu.Lock()
+	s.SweptSubnets = append(s.SweptSubnets, subnet)
+	s.sweptMu.Unlock()
+}
+
+func (s *FakeSweeper) GetSweptSubnets() []*net.IPNet {
+	s.sweptMu.Lock()
+	defer s.sweptMu.Unlock()
+	cp := make([]*net.IPNet, len(s.SweptSubnets))
+	copy(cp, s.SweptSubnets)
+	return cp
+}
 
 func MustIP(t testing.TB, s string) net.IP {
 	t.Helper()

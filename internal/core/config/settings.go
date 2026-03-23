@@ -101,6 +101,23 @@ func GlobalSettings() []GlobalSetting {
 			},
 		},
 		{
+			YAMLKey:  "target_subnets",
+			FlagName: "target-subnets",
+			Usage:    "Comma-separated list of CIDR subnets to scan (e.g. --target-subnets=10.0.0.0/24,10.0.1.0/24)",
+			Type:     FlagTypeString,
+			Sources:  all,
+			Set: func(c *Config, v string) error {
+				c.TargetSubnets = parseStringSlice(v)
+				return nil
+			},
+			Get: func(c *Config) any { return c.TargetSubnets },
+			Doc: YAMLDoc{
+				Comment:      "Uncomment to specify target subnets to scan - when set, the interface subnet is not auto-scanned",
+				ExampleValue: "[\"192.168.1.0/24\", \"10.0.0.0/24\"]",
+				CommentedOut: true,
+			},
+		},
+		{
 			YAMLKey:  "scan_interval",
 			FlagName: "interval",
 			Short:    "n",

@@ -1,6 +1,7 @@
 package discovery_test
 
 import (
+	"net"
 	"testing"
 	"time"
 
@@ -31,4 +32,27 @@ func TestWithScanInterval_RejectsNegative(t *testing.T) {
 	)
 	require.Error(t, err)
 	require.Nil(t, e)
+}
+
+func TestWithTargetSubnets_AcceptsValid(t *testing.T) {
+	_, subnet, _ := net.ParseCIDR("10.0.0.0/24")
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{discovery.NewDevice(testkit.MustIP(t, "10.0.0.1"))}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(testkit.MustInterfaceInfo(t)),
+		discovery.WithScanners(s),
+		discovery.WithTargetSubnets([]*net.IPNet{subnet}),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+}
+
+func TestWithTargetSubnets_AcceptsNil(t *testing.T) {
+	s := &testkit.FakeScanner{Devices: []*discovery.Device{discovery.NewDevice(testkit.MustIP(t, "10.0.0.1"))}}
+	e, err := discovery.NewEngine(
+		discovery.WithInterface(testkit.MustInterfaceInfo(t)),
+		discovery.WithScanners(s),
+		discovery.WithTargetSubnets(nil),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, e)
 }

@@ -35,6 +35,16 @@ func getSettingTestCases() []settingTestCase {
 			expectedYAML: "en0",
 		},
 		{
+			yamlKey:      "target_subnets",
+			envVar:       "WHOSTHERE__TARGET_SUBNETS",
+			envValue:     "10.0.0.0/24,10.0.1.0/24",
+			expectedEnv:  []string{"10.0.0.0/24", "10.0.1.0/24"},
+			flagValue:    "192.168.1.0/24,172.16.0.0/16",
+			expectedFlag: []string{"192.168.1.0/24", "172.16.0.0/16"},
+			yamlValue:    "[\"10.0.0.0/24\", \"10.0.1.0/24\"]",
+			expectedYAML: []string{"10.0.0.0/24", "10.0.1.0/24"},
+		},
+		{
 			yamlKey:      "scan_timeout",
 			envVar:       "WHOSTHERE__SCAN_TIMEOUT",
 			envValue:     "15s",
@@ -478,6 +488,9 @@ func TestFullYAMLConfig_LoadFromFile(t *testing.T) {
 	fullYAML := `
 scan_timeout: 12s
 scan_interval: 45s
+target_subnets:
+  - "10.0.0.0/24"
+  - "10.0.1.0/24"
 
 scanners:
   mdns:
@@ -534,6 +547,7 @@ theme:
 	}{
 		{"scan_timeout", cfg.ScanTimeout, 12 * time.Second},
 		{"scan_interval", cfg.ScanInterval, 45 * time.Second},
+		{"target_subnets", cfg.TargetSubnets, []string{"10.0.0.0/24", "10.0.1.0/24"}},
 		{"scanners.mdns.enabled", cfg.Scanners.MDNS.Enabled, false},
 		{"scanners.ssdp.enabled", cfg.Scanners.SSDP.Enabled, false},
 		{"scanners.arp.enabled", cfg.Scanners.ARP.Enabled, true},

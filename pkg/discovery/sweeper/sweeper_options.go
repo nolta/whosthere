@@ -2,21 +2,29 @@ package sweeper
 
 import (
 	"errors"
+	"net"
 	"time"
 
 	"github.com/ramonvermeulen/whosthere/pkg/discovery"
 )
 
-// Option configures a Sweeper during construction.
 type Option func(*Sweeper) error
 
-// WithSweeperInterface sets the network interface for sweeping.
 func WithSweeperInterface(iface *discovery.InterfaceInfo) Option {
 	return func(s *Sweeper) error {
 		if iface == nil {
 			return errors.New("interface cannot be nil")
 		}
 		s.iface = iface
+		return nil
+	}
+}
+
+// WithSweeperTargetSubnets sets explicit subnets for sweeping.
+// When set, the sweeper sweeps these subnets instead of the interface subnet.
+func WithSweeperTargetSubnets(subnets []*net.IPNet) Option {
+	return func(s *Sweeper) error {
+		s.targetSubnets = subnets
 		return nil
 	}
 }

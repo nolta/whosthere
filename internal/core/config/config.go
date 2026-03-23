@@ -26,6 +26,7 @@ var DefaultTCPPorts = []int{21, 22, 23, 25, 80, 110, 135, 139, 143, 389, 443, 44
 // Config captures all configurable parameters for the application.
 type Config struct {
 	NetworkInterface string        `yaml:"network_interface"`
+	TargetSubnets    []string      `yaml:"target_subnets"`
 	ScanInterval     time.Duration `yaml:"scan_interval"`
 	// ScanDuration is deprecated.
 	//
@@ -178,6 +179,12 @@ func (c *Config) normalizeBasics() error {
 	if c.NetworkInterface != "" {
 		if _, err := net.InterfaceByName(c.NetworkInterface); err != nil {
 			errs = append(errs, "network_interface does not exist: "+c.NetworkInterface)
+		}
+	}
+
+	for _, cidr := range c.TargetSubnets {
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			errs = append(errs, "invalid target_subnet: "+cidr)
 		}
 	}
 

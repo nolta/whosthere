@@ -63,11 +63,12 @@ func writeNesting(sb *strings.Builder, parts, prevPath []string) {
 	}
 }
 
-func writeSettingLine(sb *strings.Builder, s *GlobalSetting, parts []string, indent string, defaults *Config) {
+func writeSettingLine(sb *strings.Builder, s *GlobalSetting, parts []string, indent string, cfg *Config) {
 	key := parts[len(parts)-1]
-	value := getDisplayValue(s, defaults)
+	commentOut := s.Doc.CommentedOut && !hasUserValue(s, cfg)
+	value := getDisplayValue(s, cfg, commentOut)
 
-	if s.Doc.CommentedOut {
+	if commentOut {
 		sb.WriteString(indent)
 		sb.WriteString("# ")
 		sb.WriteString(key)
@@ -83,12 +84,29 @@ func writeSettingLine(sb *strings.Builder, s *GlobalSetting, parts []string, ind
 	}
 }
 
-func getDisplayValue(s *GlobalSetting, defaults *Config) string {
-	if s.Doc.ExampleValue != "" {
+func hasUserValue(s *GlobalSetting, cfg *Config) bool {
+	if s.Get == nil {
+		return false
+	}
+	v := s.Get(cfg)
+	switch val := v.(type) {
+	case string:
+		return val != ""
+	case []string:
+		return len(val) > 0
+	case bool:
+		return val
+	default:
+		return false
+	}
+}
+
+func getDisplayValue(s *GlobalSetting, cfg *Config, commentedOut bool) string {
+	if commentedOut && s.Doc.ExampleValue != "" {
 		return s.Doc.ExampleValue
 	}
 	if s.Get != nil {
-		return formatValue(s.Get(defaults))
+		return formatValue(s.Get(cfg))
 	}
 	return ""
 }
@@ -117,6 +135,15 @@ func formatValue(v any) string {
 			parts[i] = fmt.Sprintf("%d", port)
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case []string:
+		if len(val) == 0 {
+			return "[]"
+		}
+		quoted := make([]string, len(val))
+		for i, s := range val {
+			quoted[i] = fmt.Sprintf("%q", s)
+		}
+		return "[" + strings.Join(quoted, ", ") + "]"
 	case time.Duration:
 		return formatDuration(val)
 	case fmt.Stringer:

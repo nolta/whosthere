@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net"
 
 	"github.com/ramonvermeulen/whosthere/internal/core/config"
 	"github.com/ramonvermeulen/whosthere/internal/core/paths"
@@ -30,6 +32,11 @@ func BuildEngine(cfg *config.Config, logger discovery.Logger) (*discovery.Engine
 	}
 
 	iface, err := discovery.NewInterfaceInfo(cfg.NetworkInterface)
+	if err != nil {
+		return nil, err
+	}
+
+	targetSubnets, err := parseTargetSubnets(cfg.TargetSubnets)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +71,7 @@ func BuildEngine(cfg *config.Config, logger discovery.Logger) (*discovery.Engine
 		discovery.WithScanTimeout(cfg.ScanTimeout),
 		discovery.WithScanInterval(cfg.ScanInterval),
 		discovery.WithLogger(logger),
+		discovery.WithTargetSubnets(targetSubnets),
 	}
 
 	if ouiDB != nil {
@@ -76,10 +84,26 @@ func BuildEngine(cfg *config.Config, logger discovery.Logger) (*discovery.Engine
 			sweeper.WithSweeperInterval(cfg.Sweeper.Interval),
 			sweeper.WithSweeperTimeout(cfg.Sweeper.Timeout),
 			sweeper.WithSweeperLogger(logger),
+			sweeper.WithSweeperTargetSubnets(targetSubnets),
 		}
 		s, _ := sweeper.New(sweeperOpts...)
 		opts = append(opts, discovery.WithSweeper(s))
 	}
 
 	return discovery.NewEngine(opts...)
+}
+
+func parseTargetSubnets(cidrs []string) ([]*net.IPNet, error) {
+	if len(cidrs) == 0 {
+		return nil, nil
+	}
+	subnets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, subnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid target subnet %q: %w", cidr, err)
+		}
+		subnets = append(subnets, subnet)
+	}
+	return subnets, nil
 }

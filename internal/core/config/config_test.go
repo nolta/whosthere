@@ -174,3 +174,54 @@ splash:
 		t.Errorf("expected default splash delay %v, got %v", DefaultSplashDelay, cfg.Splash.Delay)
 	}
 }
+
+func TestValidateTargetSubnets_InvalidCIDR(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TargetSubnets = []string{"not-a-cidr", "192.168.1.0/24"}
+
+	err := cfg.validateAndNormalize()
+	if err == nil {
+		t.Fatal("expected validation error for invalid CIDR")
+	}
+	if !strings.Contains(err.Error(), "invalid target_subnet: not-a-cidr") {
+		t.Errorf("expected invalid target_subnet error, got %v", err)
+	}
+}
+
+func TestValidateTargetSubnets_ValidCIDRs(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.TargetSubnets = []string{"10.0.0.0/24", "172.16.0.0/16"}
+
+	if err := cfg.validateAndNormalize(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestValidateTargetSubnets_EmptyIsValid(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if err := cfg.validateAndNormalize(); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestYAMLUnmarshalTargetSubnets(t *testing.T) {
+	raw := `
+target_subnets:
+  - "10.0.0.0/24"
+  - "192.168.1.0/24"
+scanners:
+  mdns:
+    enabled: true
+`
+	cfg := DefaultConfig()
+	if err := yaml.Unmarshal([]byte(raw), cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(cfg.TargetSubnets) != 2 {
+		t.Fatalf("expected 2 subnets, got %d", len(cfg.TargetSubnets))
+	}
+	if cfg.TargetSubnets[0] != "10.0.0.0/24" || cfg.TargetSubnets[1] != "192.168.1.0/24" {
+		t.Errorf("unexpected subnets: %v", cfg.TargetSubnets)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 
@@ -51,6 +52,7 @@ type Scanner interface {
 // The sweeper can be overridden by providing a custom implementation.
 type Sweeper interface {
 	Start(ctx context.Context)
+	Sweep(ctx context.Context, subnet *net.IPNet)
 }
 
 // ScanStats contains statistics about a completed scan.
@@ -80,16 +82,14 @@ type ScanResults struct {
 // Engine coordinates multiple scanners and merges device results.
 // It exposes two read-only channels: Devices for discovered devices and Events for scan lifecycle.
 type Engine struct {
-	// Events is a read-only channel for all events
 	Events <-chan Event
-	// Private write channel
 	events chan Event
 
-	scanners []Scanner
-	sweeper  Sweeper
-	// todo: what to do with this public field?
-	// maybe refactor as part of runtime interface switching?
+	scanners      []Scanner
+	sweeper       Sweeper
 	Iface         *InterfaceInfo
+	targetSubnets []*net.IPNet
+	knownSubnets  []*net.IPNet
 	sweepInterval time.Duration
 	sweepTimeout  time.Duration
 	scanInterval  time.Duration
@@ -97,6 +97,9 @@ type Engine struct {
 	ouiRegistry   *oui.Registry
 	logger        Logger
 	maxDevices    int
+
+	sweptMu      sync.Mutex
+	sweptSubnets map[string]time.Time
 
 	mu      sync.RWMutex
 	cancel  context.CancelFunc
@@ -144,6 +147,9 @@ func NewEngine(opts ...Option) (*Engine, error) {
 	if e.Iface == nil {
 		return nil, ErrNoInterface
 	}
+
+	e.sweptSubnets = make(map[string]time.Time)
+	e.knownSubnets = buildKnownSubnets(e.Iface.IPv4Net, e.targetSubnets)
 
 	e.events = make(chan Event, DefaultEventBuf)
 	e.Events = e.events
@@ -354,7 +360,7 @@ func (e *Engine) performScan(ctx context.Context) (*ScanResults, error) {
 	var mu sync.Mutex
 	for device := range scannerOut {
 		mu.Lock()
-		e.processDevice(device, devices)
+		e.processDevice(ctx, device, devices)
 		mu.Unlock()
 	}
 
@@ -372,8 +378,7 @@ func (e *Engine) performScan(ctx context.Context) (*ScanResults, error) {
 	return results, nil
 }
 
-// processDevice handles a single discovered device
-func (e *Engine) processDevice(d *Device, devices map[string]*Device) {
+func (e *Engine) processDevice(ctx context.Context, d *Device, devices map[string]*Device) {
 	if d == nil {
 		return
 	}
@@ -384,6 +389,10 @@ func (e *Engine) processDevice(d *Device, devices map[string]*Device) {
 
 	key := d.IP().String()
 	if key == "" {
+		return
+	}
+
+	if len(e.targetSubnets) > 0 && !ipInSubnets(d.IP(), e.targetSubnets) {
 		return
 	}
 
@@ -400,6 +409,7 @@ func (e *Engine) processDevice(d *Device, devices map[string]*Device) {
 	}
 
 	e.emit(NewDeviceEvent(d))
+	e.maybeReactiveSweep(ctx, d.IP())
 }
 
 // emit sends an event non-blocking
@@ -431,4 +441,60 @@ func mapToSlicePtr(m map[string]*Device) []*Device {
 		res = append(res, v)
 	}
 	return res
+}
+
+func (e *Engine) maybeReactiveSweep(ctx context.Context, ip net.IP) {
+	if e.sweeper == nil {
+		return
+	}
+	if ipInSubnets(ip, e.knownSubnets) {
+		return
+	}
+
+	subnet := ipTo24(ip)
+	if subnet == nil {
+		return
+	}
+	key := subnet.String()
+
+	e.sweptMu.Lock()
+	if last, ok := e.sweptSubnets[key]; ok && time.Since(last) < e.sweepInterval {
+		e.sweptMu.Unlock()
+		return
+	}
+	e.sweptSubnets[key] = time.Now()
+	e.sweptMu.Unlock()
+
+	e.logger.Log(ctx, slog.LevelInfo, "reactive sweep triggered for discovered device outside known subnets", "subnet", key)
+	go e.sweeper.Sweep(ctx, subnet)
+}
+
+func ipTo24(ip net.IP) *net.IPNet {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return nil
+	}
+	return &net.IPNet{
+		IP:   net.IPv4(ip4[0], ip4[1], ip4[2], 0).To4(),
+		Mask: net.CIDRMask(24, 32),
+	}
+}
+
+func ipInSubnets(ip net.IP, subnets []*net.IPNet) bool {
+	for _, subnet := range subnets {
+		if subnet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildKnownSubnets(ifaceNet *net.IPNet, targetSubnets []*net.IPNet) []*net.IPNet {
+	if len(targetSubnets) > 0 {
+		return targetSubnets
+	}
+	if ifaceNet != nil {
+		return []*net.IPNet{ifaceNet}
+	}
+	return nil
 }

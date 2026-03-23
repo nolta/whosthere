@@ -42,6 +42,23 @@ func parseInt(s string) (int, error) {
 	return int(i), err
 }
 
+func parseStringSlice(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
 func parseIntSlice(s string) ([]int, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {

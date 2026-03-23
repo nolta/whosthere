@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"errors"
+	"net"
 	"time"
 
 	"github.com/ramonvermeulen/whosthere/pkg/discovery/oui"
@@ -115,6 +116,16 @@ func WithScanners(scanners ...Scanner) Option {
 func WithOUIRegistry(registry *oui.Registry) Option {
 	return func(e *Engine) error {
 		e.ouiRegistry = registry
+		return nil
+	}
+}
+
+// WithTargetSubnets configures explicit subnets for scanning.
+// When set, the engine only keeps devices whose IP falls within one of these subnets.
+// The sweeper will sweep these subnets instead of the interface subnet.
+func WithTargetSubnets(subnets []*net.IPNet) Option {
+	return func(e *Engine) error {
+		e.targetSubnets = subnets
 		return nil
 	}
 }

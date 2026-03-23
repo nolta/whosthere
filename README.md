@@ -140,6 +140,9 @@ Whosthere looks for the configuration file in the following order, using the fir
 # Uncomment the next line to configure a specific network interface - uses OS default if not set
 # network_interface: eth0
 
+# Uncomment to specify target subnets to scan - when set, the interface subnet is not auto-scanned
+# target_subnets: ["192.168.1.0/24", "10.0.0.0/24"]
+
 # How often to run discovery scans
 scan_interval: 20s
 
@@ -217,6 +220,7 @@ Examples:
 - `WHOSTHERE__SPLASH__ENABLED=false` - Disable the splash screen, equivalent to `splash.enabled: false` in the YAML config
 - `WHOSTHERE__SPLASH__DELAY=2s` - Set splash screen delay to 2 seconds, equivalent to `splash.delay: 2s` in the YAML config
 - `WHOSTHERE__SCAN_INTERVAL=30s` - Set scan interval to 30 seconds, equivalent to `scan_interval: 30s` in the YAML config
+- `WHOSTHERE__TARGET_SUBNETS=192.168.1.0/24,10.0.0.0/24` - Set target subnets to scan, equivalent to `target_subnets: ["192.168.1.0/24", "10.0.0.0/24"]` in the YAML config
 - `WHOSTHERE__SCANNERS__MDNS__ENABLED=false` - Disable mDNS scanner, equivalent to `scanners.mdns.enabled: false` in the YAML config
 - `WHOSTHERE__PORT_SCANNER__TCP=80,443,8080` - Set custom TCP ports to scan, equivalent to `port_scanner.tcp: [80, 443, 8080]` in the YAML config
 - `WHOSTHERE__THEME__NAME=cyberpunk` - Set theme to cyberpunk, equivalent to `theme.name: cyberpunk` in the YAML config

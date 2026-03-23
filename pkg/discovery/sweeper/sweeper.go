@@ -36,10 +36,11 @@ var _ discovery.Sweeper = (*Sweeper)(nil)
 //
 // Runs continuously at the configured interval when started.
 type Sweeper struct {
-	iface    *discovery.InterfaceInfo
-	interval time.Duration
-	timeout  time.Duration
-	logger   discovery.Logger
+	iface         *discovery.InterfaceInfo
+	targetSubnets []*net.IPNet
+	interval      time.Duration
+	timeout       time.Duration
+	logger        discovery.Logger
 }
 
 // New creates a Sweeper with the specified options.
@@ -97,26 +98,45 @@ func New(opts ...Option) (*Sweeper, error) {
 //	go sweeper.Start(ctx)
 //	// Sweeper runs until cancel() is called
 func (s *Sweeper) Start(ctx context.Context) {
-	subnet := s.iface.IPv4Net
 	localIP := *s.iface.IPv4Addr
 
 	if s.interval <= 0 {
-		s.runSweep(ctx, subnet, localIP)
+		s.sweepAll(ctx, localIP)
 		return
 	}
 
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-	s.runSweep(ctx, subnet, localIP)
+	s.sweepAll(ctx, localIP)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.runSweep(ctx, subnet, localIP)
+			s.sweepAll(ctx, localIP)
 		}
+	}
+}
+
+// Sweep performs a one-shot sweep of the given subnet.
+// Used by the engine for reactive sweeps when devices are found outside known subnets.
+func (s *Sweeper) Sweep(ctx context.Context, subnet *net.IPNet) {
+	localIP := *s.iface.IPv4Addr
+	s.runSweep(ctx, subnet, localIP)
+}
+
+func (s *Sweeper) sweepAll(ctx context.Context, localIP net.IP) {
+	subnets := s.targetSubnets
+	if len(subnets) == 0 {
+		subnets = []*net.IPNet{s.iface.IPv4Net}
+	}
+	for _, subnet := range subnets {
+		if ctx.Err() != nil {
+			return
+		}
+		s.runSweep(ctx, subnet, localIP)
 	}
 }
 

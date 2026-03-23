@@ -160,3 +160,129 @@ func TestThemePersistence_ChangeAndReload(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "monokai", reloaded2.Theme.Name)
 }
+
+func TestSave_TargetSubnets_RoundTrip_InlineArray(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	cfg.TargetSubnets = []string{"10.0.0.0/24", "192.168.1.0/24"}
+
+	err := Save(cfg, configPath)
+	require.NoError(t, err)
+
+	loaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/24", "192.168.1.0/24"}, loaded.TargetSubnets)
+}
+
+func TestSave_TargetSubnets_RoundTrip_DashArraySyntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+target_subnets:
+  - "10.0.0.0/24"
+  - "192.168.1.0/24"
+scanners:
+  mdns:
+    enabled: true
+  ssdp:
+    enabled: true
+  arp:
+    enabled: true
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0o644)
+	require.NoError(t, err)
+
+	loaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/24", "192.168.1.0/24"}, loaded.TargetSubnets)
+}
+
+func TestSave_TargetSubnets_PreservedAfterThemeChange(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	cfg.TargetSubnets = []string{"10.0.0.0/24", "172.16.0.0/16"}
+
+	err := Save(cfg, configPath)
+	require.NoError(t, err)
+
+	loaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/24", "172.16.0.0/16"}, loaded.TargetSubnets)
+
+	loaded.Theme.Name = "dracula"
+	err = Save(loaded, configPath)
+	require.NoError(t, err)
+
+	reloaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, "dracula", reloaded.Theme.Name)
+	assert.Equal(t, []string{"10.0.0.0/24", "172.16.0.0/16"}, reloaded.TargetSubnets)
+}
+
+func TestSave_TargetSubnets_DashSyntaxSurvivedAfterThemeChange(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+target_subnets:
+  - "10.0.0.0/24"
+  - "192.168.1.0/24"
+scanners:
+  mdns:
+    enabled: true
+  ssdp:
+    enabled: true
+  arp:
+    enabled: true
+`
+	err := os.WriteFile(configPath, []byte(yamlContent), 0o644)
+	require.NoError(t, err)
+
+	loaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/24", "192.168.1.0/24"}, loaded.TargetSubnets)
+
+	loaded.Theme.Name = "monokai"
+	err = Save(loaded, configPath)
+	require.NoError(t, err)
+
+	reloaded, err := LoadForMode(ModeApp, &Flags{ConfigFile: configPath})
+	require.NoError(t, err)
+	assert.Equal(t, "monokai", reloaded.Theme.Name)
+	assert.Equal(t, []string{"10.0.0.0/24", "192.168.1.0/24"}, reloaded.TargetSubnets)
+}
+
+func TestSave_TargetSubnets_EmptyNotWrittenActive(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	err := Save(cfg, configPath)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "# target_subnets:")
+	assert.NotContains(t, string(raw), "\ntarget_subnets:")
+}
+
+func TestSave_TargetSubnets_SetValueWrittenUncommented(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	cfg.TargetSubnets = []string{"10.0.0.0/24"}
+
+	err := Save(cfg, configPath)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), `target_subnets: ["10.0.0.0/24"]`)
+	assert.NotContains(t, string(raw), "# target_subnets:")
+}
