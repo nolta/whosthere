@@ -7,9 +7,9 @@ import (
 
 // These are intended to be set by GoReleaser (or other build tooling) via -ldflags.
 // By convention:
-//   - main.version: current git tag (without leading v), or snapshot name
-//   - main.commit:  current git commit SHA
-//   - main.date:    build date in RFC3339 format
+//   - main.versionStr: current git tag (without leading v), or snapshot name
+//   - main.commitStr:  current git commit SHA
+//   - main.dateStr:    build date in RFC3339 format
 var (
 	versionStr = "dev"
 	commitStr  = "unknown"
